@@ -4,9 +4,11 @@ How a 300 rated player sees chess 2
 ## Installing & running
 1. Install latest release
 2. If you don't have python, [install it](https://www.python.org) (3.10+)
-3. Install pygame manually or run `install-pygame.bat`
-4. Run `main.py`
-   - Run `debug.bat` instead if you want to catch a crash
+3. Install pygame
+   - Run `pip install pygame` to install manually
+   - Run "install-pygame.bat" if you want me to do this for you
+5. Run "main.py"
+   - Run "debug.bat" instead if you want to catch a crash
 
 ## Other
 Me on discord: `leyn1092`

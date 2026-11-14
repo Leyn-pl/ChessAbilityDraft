@@ -1,4 +1,4 @@
-# Chess - Ability Draft (1.0)
+# Chess - Ability Draft (1.1)
 # Made by LEYN1092
 # Discord: leyn1092
 # Github: Leyn-pl
@@ -9,13 +9,19 @@
 
 # Beta tester: musorshiк
 
+"""Change this to any other supported langauge.
+Supported langauges are listed in "lang" folder as Python scripts."""
+import lang.en as lang
+
 from random import randint
 import pygame
 import math
 import sys
 import time
+from config import *
 
 print('Loading...')
+print(f'Selected langauge: {lang.NAME}')
 
 # Used by all pieces
 class Piece:
@@ -27,8 +33,29 @@ class Piece:
         self.color: str = 'White' if self.team == 0 else 'Black'
         self.id: int = getId(self.name)
         self.cost: int = getCost(self.name)
-        self.status: list[str,int] = ['none', 0]
+        self.statuses: list[list[str,int]] = []
         self.charge: int = 0
+    def isUntakable(self):
+        for status in self.statuses:
+            if status[0] == 'immune' or status[0] == 'ghost':
+                return True
+        return False
+    def isImmune(self):
+        for status in self.statuses:
+            if status[0] == 'immune':
+                return True
+        return False
+    def isGhost(self):
+        for status in self.statuses:
+            if status[0] == 'ghost':
+                return True
+        return False
+    def isControllable(self):
+        if self.name == 'trap': return False
+        for status in self.statuses:
+            if status[0] == 'locked':
+                return False
+        return True
     def __repr__(self):
         return f'Piece({self.team}, \'{self.name}\', {self.x}, {self.y})'
     def __str__(self):
@@ -43,14 +70,14 @@ def useAbility(piece: Piece, toPos: list[int]) -> None:
         move(piece, toPos, False)
         move(swapWith, fromPos, False)
         # Reverse
-        startMove(int(not playerMove))
+        startTurn(int(not playerMove))
     elif piece.name == 'king' and getAbility(piece.team, 5) == 0:
-        piece.status = ['immune', 1]      
+        piece.statuses.append(['immune', 1])
     else:
         move(piece, toPos)
         if piece.name != 'queen':
             # Reverse
-            startMove(int(not playerMove))
+            startTurn(int(not playerMove))
 
 # Move or create a piece. Returns killed piece or False
 def move(piece: Piece, toPos: list[int], move: bool = True) -> Piece|bool:
@@ -63,27 +90,12 @@ def move(piece: Piece, toPos: list[int], move: bool = True) -> Piece|bool:
     Board[toPos[1]][toPos[0]] = piece
     return moveTo
 # Gets piece id by name
-def getId(name: str) -> int:
-    match name:
-        case 'pawn':
-            return 0
-        case 'rook':
-            return 1
-        case 'knight':
-            return 2
-        case 'bishop':
-            return 3
-        case 'queen':
-            return 4
-        case 'king':
-            return 5
-        case 'trap':
-            return 6
-        case 'zombie':
-            return 7
-        case _:
-            return -1
 pieceNames: list[str] = ['pawn', 'rook', 'knight', 'bishop', 'queen', 'king', 'trap', 'zombie']
+def getId(name: str) -> int:
+    if name in pieceNames:
+        return pieceNames.index(name)
+    else:
+        return -1
 def getName(pieceId: int) -> str:
     global pieceNames
     return pieceNames[pieceId]
@@ -101,7 +113,6 @@ def getCost(name: str) -> int:
         return 0
 # Returns False or Piece object
 def getBoard(x: int, y: int) -> Piece|bool:
-    global Board
     return Board[y][x]
 
 # Place pieces of one type on the board
@@ -138,54 +149,20 @@ Abils: list[list[int]] = [[0 for _ in range(6)], [0 for _ in range(6)]]
 def getAbility(team: int, pieceId: int) -> int:
     global Abils
     return Abils[team][pieceId]
+
+def writeStr(writeTo: list[str], args: list[str]) -> None:
+    for arg in args:
+        writeTo.append(arg)
     
 # Ability descriptions
 AbilDescr: list[list[list[str]]] = [[[], []] for _ in range(6)]
-# 1st abilities (actives)
-AbilDescr[0][0].append('Pawn can make double move again')
-AbilDescr[0][0].append('after kills a piece.')
-AbilDescr[1][0].append('Can swap with friendly piece in reach.')
-AbilDescr[1][0].append('Cooldown: 3 normal rook moves.')
-AbilDescr[2][0].append('Knight can move 3 squares straight')
-AbilDescr[2][0].append('after 4 normal knight moves.')
-AbilDescr[3][0].append('Can go 1 square in any direction.')
-AbilDescr[3][0].append('Cooldown: 3 normal bishop moves.')
-AbilDescr[4][0].append('Places traps every normal move in')
-AbilDescr[4][0].append('previous location. Lifetime: 2 moves.')
-AbilDescr[4][0].append('Can teleport to any trap once.')
-AbilDescr[4][0].append('Instant.')
-AbilDescr[5][0].append('Becomes invincible for 1 move.')
-AbilDescr[5][0].append('Cooldown: enemy queen death.')
-AbilDescr[5][0].append('Instant.')
-# 2nd abilities (passives)
-AbilDescr[0][1].append('King is invincible if 6+ pawns are alive.')
-AbilDescr[1][1].append('WIP')
-AbilDescr[2][1].append('If kills a rook or a queen, you can')
-AbilDescr[2][1].append('make another move.')
-AbilDescr[3][1].append('Kills the piece, which killed your bishop.')
-AbilDescr[4][1].append('Summons a controllable zombie pawn every normal')
-AbilDescr[4][1].append('move in previous location. Lifetime: 3 moves.')
-AbilDescr[5][1].append('King can move 2 squares like a rook.')
-
-# Full guide
-Guide: list[str] = []
-Guide.append('KING AND GAME CHANGES:')
-Guide.append('Game ends when one of the kings dies.')
-Guide.append('There are no checks, mates and stalemates.')
-Guide.append('Player can skip their move.')
-Guide.append('You can castle if position is correct,')
-Guide.append('even if you moved the king.')
-Guide.append('')
-Guide.append('SPECIAL MOVES:')
-Guide.append('There is no en passant.')
-Guide.append('A green dot is normal a move.')
-Guide.append('A dot with red outlile is a kill move.')
-Guide.append('A dot with yellow outline is an ability move.')
-Guide.append('Instant ability means you can make a move')
-Guide.append('after it.')
-Guide.append('To promote a pawn or castle, press wand button.')
-Guide.append('If an ability has "Cooldown: ", it is charged')
-Guide.append('when the game starts.')
+# Load
+for i in range(6):
+    for j in range(2):
+        writeStr(AbilDescr[i][j], lang.Ability[i][j])
+# Load guide
+Guide = lang.Guide
+guidePage = 0
 
 # Which player's move
 playerMove: int = 0
@@ -211,12 +188,12 @@ def getMoves(piece: Piece) -> list[list[int,int,str]]:
                 # Kill left
                 if piece.x > 0:
                     if target := getBoard(piece.x - 1, piece.y + 1):
-                        if target.team != piece.team and target.status[0] != 'immune':
+                        if target.team != piece.team and not target.isUntakable():
                             moves.append([-1,1,'k'])
                 # Kill right
                 if piece.x < 7:
                     if target := getBoard(piece.x + 1, piece.y + 1):
-                        if target.team != piece.team and target.status[0] != 'immune':
+                        if target.team != piece.team and not target.isUntakable():
                             moves.append([1,1,'k'])
             # Black pawn
             else:
@@ -230,12 +207,12 @@ def getMoves(piece: Piece) -> list[list[int,int,str]]:
                 # Kill left
                 if piece.x > 0:
                     if target := getBoard(piece.x - 1, piece.y - 1):
-                        if target.team != piece.team and target.status[0] != 'immune':
+                        if target.team != piece.team and not target.isUntakable():
                             moves.append([-1,-1,'k'])
                 # Kill right
                 if piece.x < 7:
                     if target := getBoard(piece.x + 1, piece.y - 1):
-                        if target.team != piece.team and target.status[0] != 'immune':
+                        if target.team != piece.team and not target.isUntakable():
                             moves.append([1,-1,'k'])        
         return moves
     if piece.name in ['rook', 'queen']:
@@ -249,7 +226,7 @@ def getMoves(piece: Piece) -> list[list[int,int,str]]:
                 if moveToX in range(8) and moveToY in range(8):
                     # Check if there is no friendly piece
                     if target := getBoard(moveToX, moveToY):
-                        if target.team != piece.team and target.status[0] != 'immune':
+                        if target.team != piece.team and not target.isUntakable():
                             # Kill and block further movement
                             moves.append([xMovement, yMovement, 'k'])
                         # If there is a friendly piece, check for rook's ability
@@ -274,7 +251,7 @@ def getMoves(piece: Piece) -> list[list[int,int,str]]:
                 if moveToX in range(8) and moveToY in range(8):
                     # Check if there is no friendly piece
                     if target := getBoard(moveToX, moveToY):
-                        if target.team != piece.team and target.status[0] != 'immune':
+                        if target.team != piece.team and not target.isUntakable():
                             # Kill
                             moves.append([xMovement, yMovement, 'k'])
                     else:
@@ -289,7 +266,7 @@ def getMoves(piece: Piece) -> list[list[int,int,str]]:
                 if moveToX in range(8) and moveToY in range(8):
                     # Check if there is no friendly piece
                     if target := getBoard(moveToX, moveToY):
-                        if target.team != piece.team and target.status[0] != 'immune':
+                        if target.team != piece.team and not target.isUntakable():
                             # Kill
                             moves.append([xMovement, yMovement, 'k'])
                     else:
@@ -330,7 +307,7 @@ def getMoves(piece: Piece) -> list[list[int,int,str]]:
                 if moveToX in range(8) and moveToY in range(8):
                     # Check if there is no friendly piece
                     if target := getBoard(moveToX, moveToY):
-                        if target.team != piece.team and target.status[0] != 'immune':
+                        if target.team != piece.team and not target.isUntakable():
                             # Kill and block further movement
                             moves.append([xMovement, yMovement, 'k'])
                         # A piece is in the way
@@ -358,7 +335,7 @@ def getMoves(piece: Piece) -> list[list[int,int,str]]:
             if moveToX in range(8) and moveToY in range(8):
                 # Check if there is no friendly piece
                 if target := getBoard(moveToX, moveToY):
-                    if target.team != piece.team and target.status[0] != 'immune':
+                    if target.team != piece.team and not target.isUntakable() and not piece.isGhost():
                         # Kill
                         moves.append([xMovement, yMovement, 'k'])
                 # No need to block movement here
@@ -375,9 +352,9 @@ def getMoves(piece: Piece) -> list[list[int,int,str]]:
                 moveToY: int = piece.y + yMovement
                 # Check if not out of board
                 if moveToX in range(8) and moveToY in range(8):
-                    # Check if there is no friendly piece
+                    # Check if there is no friendly piece, also check if an enemy is in ability range
                     if target := getBoard(moveToX, moveToY):
-                        if target.team != piece.team and target.status[0] != 'immune':
+                        if target.team != piece.team and not target.isUntakable() and not piece.isGhost() and scale == 1:
                             # Kill and block further movement
                             moves.append([xMovement, yMovement, 'k'])
                         # A piece is in the way
@@ -442,11 +419,11 @@ def boardClick(screenX: int, screenY: int) -> None:
         boardX: int = math.floor(screenX / 80)
         boardY: int = 7 - math.floor(screenY / 80)
     # Try to select a piece
-    if not selected:
+    if getBoard(boardX, boardY) and not selected:
         selected = getBoard(boardX, boardY)
         if selected:
             # Traps and enemy pieces are uncontrollable
-            if selected.team == playerMove and selected.name != 'trap':
+            if selected.team == playerMove and selected.isControllable():
                 moves = getMoves(selected)
                 for moveData in moves:
                     moveToX = selected.x + moveData[0]
@@ -454,8 +431,11 @@ def boardClick(screenX: int, screenY: int) -> None:
                     possibleMoves.append([moveToX, moveToY, moveData[2]])
                 buttons.clear()
                 buttonIds.clear()
+            else:
+                deselect()
     # Try to move a piece
     else:
+        # Normal move
         if [boardX, boardY, ''] in possibleMoves:
             fromPos = [selected.x, selected.y]
             move(selected, [boardX, boardY])
@@ -465,8 +445,42 @@ def boardClick(screenX: int, screenY: int) -> None:
                 lifetime: int = 2 if getAbility(playerMove, 4) == 0 else 3
                 summoned = Piece(playerMove, toSpawn, -1, -1)
                 move(summoned, fromPos, False)
-                summoned.status = ['summoned', lifetime]
-            # Charge move based cooldown abilities
+                summoned.statuses.append(['summoned', lifetime])
+            # Rook's passive
+            if selected.name == 'rook' and getAbility(playerMove, 1) == 1:
+                # Right
+                if fromPos[0] < boardX:
+                    for checkX in range(boardX + 1, 8):
+                        if target := getBoard(checkX, boardY):
+                            if target.team != playerMove:
+                                target.statuses.append(['locked', 2])
+                                break
+                            break
+                # Left
+                elif fromPos[0] > boardX:
+                    for checkX in range(boardX - 1, -1, -1):
+                        if target := getBoard(checkX, boardY):
+                            if target.team != playerMove:
+                                target.statuses.append(['locked', 2])
+                                break
+                            break
+                # Up
+                elif fromPos[1] < boardY:
+                    for checkY in range(boardY + 1, 8):
+                        if target := getBoard(boardX, checkY):
+                            if target.team != playerMove:
+                                target.statuses.append(['locked', 2])
+                                break
+                            break
+                # Down
+                elif fromPos[1] > boardY:
+                    for checkY in range(boardY - 1, -1, -1):
+                        if target := getBoard(boardX, checkY):
+                            if target.team != playerMove:
+                                target.statuses.append(['locked', 2])
+                                break
+                            break
+            # Tick cooldown abilities
             if selected.name in ['rook', 'bishop']:
                 for piece in findPieces(selected.team, selected.name):
                     if piece.charge < 3: piece.charge += 1
@@ -474,24 +488,20 @@ def boardClick(screenX: int, screenY: int) -> None:
                 for knight in findPieces(selected.team, 'knight'):
                     if knight.charge < 4: knight.charge += 1
             # Reverse
-            startMove(int(not playerMove))                    
+            startTurn(int(not playerMove))
             deselect()
+        # Kill move
         elif [boardX, boardY, 'k'] in possibleMoves:
-            target = getBoard(boardX, boardY)
+            target: Piece = getBoard(boardX, boardY)
             move(selected, [boardX, boardY])
             if target.name != 'king':
                 # Change material and kill list
                 if not target.name in ['trap', 'zombie']:
                     material[target.team] -= target.cost
                     kills[playerMove].append(target.name)
-                # King's active
-                if target.name == 'queen' and getAbility(playerMove, 5) == 0:
-                    findPieces(playerMove, 'king')[0].charge = 1
                 # Bishop's passive
-                if target.name == 'bishop' and getAbility(target.team, 3) == 1 and selected.status[0] != 'immune':
-                    material[playerMove] -= selected.cost
-                    kills[target.team].append(selected.name)
-                    Board[boardY][boardX] = False
+                if target.name == 'bishop' and getAbility(target.team, 3) == 1 and not selected.isUntakable():
+                    selected.statuses.append(['poison', 3])
                 # Pawn's active
                 if selected.name == 'pawn' and getAbility(playerMove, 0) == 0:
                     if selected.charge < 2: selected.charge += 2
@@ -500,11 +510,11 @@ def boardClick(screenX: int, screenY: int) -> None:
                     pass
                 else:
                     # Reverse
-                    startMove(int(not playerMove))
+                    startTurn(int(not playerMove))
             else:
                 gameOver(playerMove)
             deselect()
-            # TODO boshop's passive
+        # Ability move
         elif [boardX, boardY, 'a'] in possibleMoves:
             useAbility(selected, [boardX, boardY])
             deselect()
@@ -533,16 +543,23 @@ def deselect() -> None:
 
 # Block controls and shown the winner
 def gameOver(team) -> None:
-    global run, isGameOver, winner
+    global run, isGameOver, winner, runTimer, gameOverTime
     isGameOver = True
     buttons.clear()
     buttonIds.clear()    
     winner = team
+    runTimer = False
+    gameOverTime = time.time()
 
 # Making text on the screen easier
-def scrText(x: int, y: int, msg: str, color: tuple, mini: bool = False) -> None:
-    global FONT, FONT_MINI, screen
-    font = FONT_MINI if mini else FONT
+def scrText(x: int, y: int, msg: str, color: tuple, mini: bool = False, header: bool = False) -> None:
+    global screen
+    if mini:
+        font = FONT_MINI
+    elif header:
+        font = FONT_HEADER
+    else:
+        font = FONT
     text = font.render(msg, False, color)
     textBox = text.get_rect(center=(x, y))
     screen.blit(text, textBox)
@@ -561,26 +578,40 @@ def button(bid: int, area: pygame.rect.Rect, func: callable, arg: str='') -> Non
         buttons.append([area, func, arg])
         buttonIds.add(bid)
 
-# All things that should be done every move
-def startMove(team: int, skipped: int = False):
-    global Board, playerMove, moveCount, skipChain, moveStartTime
+# All things that should be done every turn
+def startTurn(team: int, skipped: int = False):
+    global Board, playerMove, trunCount, skipChain, moveStartTime, material
     cancelSpecialMove('')
     deselect()
     playerMove = team
     # Status duration countdown
-    for trap in findPieces(team, 'trap'):
-        trap.status[1] -= 1
-        if trap.status[1] == 0:
-            Board[trap.y][trap.x] = False
-    for zombie in findPieces(team, 'zombie'):
-        zombie.status[1] -= 1
-        if zombie.status[1] == 0:
-            Board[zombie.y][zombie.x] = False
-    findPieces(team, 'king')[0].status = ['none', 0]
+    for y in range(8):
+        for x in range(8):
+            if not (piece := Board[y][x]):
+                continue
+            if piece.team != playerMove:
+                continue
+            toRemove = []
+            for status in piece.statuses:
+                status[1] -= 1
+                # Status runs out
+                if status[1] == 0:
+                    # Check for poisoned pieces
+                    if (status[0] == 'summoned' or status[0] == 'poison') and not piece.isImmune():
+                        killCredit = 0 if piece.team == 1 else 1
+                        if piece.name == 'king':
+                            gameOver(killCredit)
+                        elif piece.cost > 0:
+                            material[piece.team] -= piece.cost
+                            kills[killCredit].append(piece.name)
+                        Board[y][x] = False
+                    toRemove.append(status)
+            for status in toRemove:
+                piece.statuses.remove(status)
     if getAbility(team, 0) == 1 and len(findPieces(team, 'pawn')) >= 6:
-        findPieces(team, 'king')[0].status = ['immune', 1]
-    moveCount += 1
-    # Tie on skip chain
+        findPieces(team, 'king')[0].statuses.append(['ghost', 1])
+    trunCount += 1
+    # Draw on skip chain
     if skipped:
         skipChain += 1
         if skipChain >= 6:
@@ -588,11 +619,10 @@ def startMove(team: int, skipped: int = False):
     else:
         skipChain = 0
     # Timer
-    if moveCount > 2:
-        if moveCount > 3:
+    if trunCount > 2:
+        if trunCount > 3:
             timer[int(not team)] += int(time.time()) - moveStartTime
-        currentTime = int(time.time())
-        moveStartTime = currentTime
+        moveStartTime = int(time.time())
 
 # Checks if player can castle left
 def canLeftCastle(team: int) -> bool:
@@ -614,28 +644,29 @@ def canRightCastle(team: int) -> bool:
     
 # All in-game buttons
 def randomiseAbilities(team: str) -> None:
-    #for piece in range(6): - no rook passive for now
-    for piece in [0, 2, 3, 4, 5]:
+    for piece in range(6):
         selectAbility(f'{team}{piece}', randint(0,1)) 
 def bugReport(_) -> None:
     global mainMenuText
-    mainMenuText = []
-    mainMenuText.append('To report a bug, contact me on discord:')
-    mainMenuText.append('leyn1092')
-    mainMenuText.append('')
-    mainMenuText.append('Please, say that you are reporting a bug!')
-    mainMenuText.append('(or high chance you will get blocked)')
+    mainMenuText = [_ for _ in lang.BugReport] # uuugh i hate python
+
+
 def showGuide(_) -> None:
-    global mainMenuText, Guide
-    mainMenuText = Guide
+    global mainMenuText, Guide, guidePage
+    if mainMenuText == Guide[guidePage]:
+        guidePage += 1
+        guidePage %= len(Guide)
+    else:
+        guidePage = 0
+    mainMenuText = Guide[guidePage]
 def selectAbility(team_piece: str, abil: int = -1) -> None:
     global Abils, mainMenuText
     team = int(team_piece[0])
     pieceId = int(team_piece[1])
     if abil == -1:
         abil = int(not getAbility(team, pieceId))
-        word = 'active' if abil == 0 else 'passive'
-        mainMenuText = [f'{getName(pieceId).upper()}\'s {word}']
+        word = lang.get('active') if abil == 0 else lang.get('passive')
+        mainMenuText = [lang.get(getName(pieceId)) + lang.get('s') + word]
         mainMenuText += AbilDescr[pieceId][abil]
     Abils[team][pieceId] = abil
 def startGame(_) -> None:
@@ -656,12 +687,12 @@ def startGame(_) -> None:
     # Clear buttons to save memory
     buttons.clear()
     buttonIds.clear()
-    startMove(0)
+    startTurn(0)
 def deselectButton(_) -> None:
     deselect()
 def skipMove(_) -> None:
     deselect()
-    startMove(int(not playerMove), True)
+    startTurn(int(not playerMove), True)
 def specialMove(_):
     global drawInsteadOfMove
     if selected.id == 0:
@@ -686,7 +717,7 @@ def castle(direction: str) -> None:
         x: int = 0
         anchor: int = -1
         kingMovement: int = -2
-    elif direction == 'right':
+    else:
         x: int = 7
         anchor: int = 1
         kingMovement: int = 2
@@ -694,24 +725,27 @@ def castle(direction: str) -> None:
     move(selected, (selected.x + kingMovement, selected.y))
     cancelSpecialMove('')
     deselect()
-    startMove(int(not playerMove))
+    startTurn(int(not playerMove))
 def flipBoardButton(_) -> None:
     global flipBoard
     flipBoard = not flipBoard
 
 # Now it's time for pygame
 pygame.init()
+pygame.display.set_caption("Chess - Ability Draft")
+pygame.display.set_icon(pygame.image.load('icon.png'))
 screen = pygame.display.set_mode((960, 720))
 
 # Presets
-mainMenuText: list[str] = ['CHESS - ABILITY DRAFT', 'Made by LEYN1092']
+mainMenuText: list[str] = ['!h', lang.get('chess') + ' - ABILITY DRAFT', lang.get('credit')]
 WHITE = (255, 255, 255)
 GRAY = (120, 128, 136)
 DARK_GRAY = (60, 64, 68)
 BLACK = (0, 0, 0)
 WHITEISH = (223, 223, 223)
 BLACKISH = (32, 32, 32)
-FONT = pygame.font.SysFont('consolas', 24)
+FONT_HEADER = pygame.font.Font(lang.DEFAULT_FONT, 4 * lang.FONT_SCALE)
+FONT = pygame.font.Font(lang.DEFAULT_FONT, 3 * lang.FONT_SCALE)
 FONT_MINI = pygame.font.SysFont('arialblack', 16)
 isGameStarted: bool = False
 isGameOver: bool = False
@@ -720,11 +754,12 @@ buttons: list[list] = []
 buttonIds: set = set()
 kills: list[list[str]] = [[], []]
 material: list[int] = [0, 0]
-moveCount: int = 1
+trunCount: int = 1
 skipChain: int = 0
 winner = None
 drawInsteadOfMove: list = ['none']
 runTimer: bool = True
+gameOverTime: int = 0
 timer: list[int] = [0, 0]
 moveStartTime: int = 0
 flipBoard: bool = False
@@ -758,24 +793,24 @@ while True:
     scrRect(0, 0, 160, 720, WHITE) # White team BG
     scrRect(800, 0, 160, 720, BLACK) # Black team BG
     scrRect(160, 640, 640, 80, GRAY) # Toolbar BG
-    scrText(80, 40, 'WHITE', BLACKISH)
-    scrText(880, 40, 'BLACK', WHITEISH)
+    scrText(80, 40, lang.get('white'), BLACKISH, header=True)
+    scrText(880, 40, lang.get('black'), WHITEISH, header=True)
     
     if not isGameStarted:
         # Randomise abilities buttons
         button(0, scrRect(160+10, 640+10, 60, 60, WHITEISH), randomiseAbilities, '0')
         button(1, scrRect(240+10, 640+10, 60, 60, BLACKISH), randomiseAbilities, '1')
-        scrText(240, 640-20, 'Random Abils', GRAY, True)
+        scrText(240, 640-20, lang.get('randomise'), GRAY, True)
         dices = [pygame.image.load(f'sprites/buttons/{team}_dice.png') for team in ['white', 'black']]
         screen.blit(dices[0], (160+10, 640+10))
         screen.blit(dices[1], (240+10, 640+10))
         # Bug report
         button(2, scrRect(640+10, 640+10, 60, 60, (128, 0, 0)), bugReport)
-        scrText(640+40, 640-20, 'Bug', GRAY, True)
+        scrText(640+40, 640-20, lang.get('bug'), GRAY, True)
         screen.blit(pygame.image.load('sprites/buttons/warning.png'), (640+10, 640+10))
         # Guide
         button(3, scrRect(720+10, 640+10, 60, 60, (0, 128, 0)), showGuide)
-        scrText(720+40, 640-20, 'Guide', GRAY, True)
+        scrText(720+40, 640-20, lang.get('guide'), GRAY, True)
         screen.blit(pygame.image.load('sprites/buttons/book.png'), (720+10, 640+10))
         
         # Create ability selection buttons
@@ -789,18 +824,23 @@ while True:
                 # Sprite
                 screen.blit(pygame.image.load(f'sprites/pieces/{team}/{piece}.png'), (startX+xOffset, startY))
                 # Black text for white team, white text for black team
-                scrText(startX+40, startY+40, '1', (255*team, 255*team, 255*team))
-                scrText(startX+120, startY+40, '2', (255*team, 255*team, 255*team))
+                scrText(startX+40, startY+40, 'I', (255*team, 255*team, 255*team))
+                scrText(startX+120, startY+40, 'II', (255*team, 255*team, 255*team))
         
         # Create play button
         button(16, scrRect(320+10, 640+10, 300, 60, (0, 0, 128)), startGame)
-        scrText(480, 640+40, 'PLAY', WHITEISH)
-        
+        scrText(480, 640+40, lang.get('play'), WHITEISH, header=True)
+
         # Write main menu text
+        nextHeader: bool = False
         for lineId in range(len(mainMenuText)):
             # Max negative = max positive = half of length
             yOffset: int = (-len(mainMenuText)/2 + lineId) * 32
-            scrText(480, 320 + yOffset, mainMenuText[lineId], WHITEISH)
+            if mainMenuText[lineId] == '!h':
+                nextHeader = True
+                continue
+            scrText(480, 320 + yOffset, mainMenuText[lineId], WHITEISH, header=nextHeader)
+            nextHeader = False
     # Show board and allow moves
     else:
         if not isGameOver:
@@ -877,23 +917,23 @@ while True:
             # Draw which player's move instead
             else:
                 scrRect(320+10, 640+10, 300, 60, playerMoveColor)
-                playerMoveText: str = 'WHITE' if playerMove == 0 else 'BLACK'
-                scrText(480, 680, f'{playerMoveText}\'s move {moveCount//2}', (255*playerMove, 255*playerMove, 255*playerMove))
+                playerMoveText: str = lang.get('white') if playerMove == 0 else lang.get('black')
+                scrText(480, 680, f'{playerMoveText}{lang.get('s')}{lang.get('turn')} {trunCount // 2}', (255 * playerMove, 255 * playerMove, 255 * playerMove))
                 
         # Show game over screen
         else:
             # Draw game over
-            if winner != None:
+            if winner is not None:
                 if winner == 0:
-                    winText: str = 'WHITE\'s victory!'
+                    winText: str = lang.get('white') + lang.get('s') + lang.get('victory')
                     winColor: tuple = WHITE
                     winTextColor: tuple = BLACK
                 elif winner == 1:
-                    winText: str = 'BLACK\'s victory!'
+                    winText: str = lang.get('black') + lang.get('s') + lang.get('victory')
                     winColor: tuple = BLACK
                     winTextColor: tuple = WHITE
                 else:
-                    winText: str = 'DRAW!'
+                    winText: str = lang.get('draw')
                     winColor: tuple = DARK_GRAY
                     winTextColor: tuple = GRAY
                 scrRect(320+10, 640+10, 300, 60, winColor)
@@ -916,24 +956,42 @@ while True:
                     # Draw an ability circle
                     if cell.id <= 5:
                         if getAbility(cell.team, cell.id) == 0:
-                            screen.blit(pygame.image.load(f'sprites/abilities/{cell.id}/{cell.charge}.png'), (160 + drawX*80+2, drawY*80+2))
+                            abilityImage = pygame.image.load(f'sprites/abilities/{cell.id}/{cell.charge}.png')
+                            abilityImage.set_alpha(255 * ABILITY_CIRCLE_ALPHA)
+                            screen.blit(abilityImage, (160 + drawX*80+2, drawY*80+2))
                     # Draw a piece
-                    screen.blit(pygame.image.load(f'sprites/pieces/{cell.team}/{cell.id}.png'), (160 + drawX*80, drawY*80))
+                    pieceImage = pygame.image.load(f'sprites/pieces/{cell.team}/{cell.id}.png')
+                    screen.blit(pieceImage, (160 + drawX * 80, drawY * 80))
+                    if ENABLE_PIECE_OUTLINE:
+                        outlineColor = DARK_GRAY if cell.team else GRAY
+                        if selected:
+                            if cell.x == selected.x and cell.y == selected.y:
+                                outlineColor = (120, 180, 120)
+                        mask = pygame.mask.from_surface(pieceImage)
+                        outline = pygame.Surface((80, 80)).convert_alpha()
+                        outline.fill((0, 0, 0, 0))
+                        outlinePoints = set()
+                        for point in mask.outline():
+                            for delta in [[-1, 0], [1, 0], [0, -1], [0, 1], [0, 0]]:
+                                outlinePoints.add((point[0] + delta[0], point[1] + delta[1]))
+                        for point in outlinePoints:
+                            outline.set_at((point[0], point[1]), outlineColor)
+                        screen.blit(outline, (160 + drawX*80, drawY*80))
                     # Draw an effect
-                    if cell.status[0] != 'none':
-                        screen.blit(pygame.image.load(f'sprites/effects/{cell.status[0]}/{cell.status[1]}.png'), (160 + drawX*80+2, drawY*80+2))
+                    for status in cell.statuses:
+                        screen.blit(pygame.image.load(f'sprites/effects/{status[0]}/{status[1]}.png'), (160 + drawX * 80 + 2, drawY * 80 + 2))
                         
         # Draw timer
         for team in range(2):
             timeToDraw: int = timer[team]
-            if team == playerMove and moveCount > 2:
-                timeToDraw += int(time.time()) - moveStartTime
-            hrs: int = timeToDraw // 3600
+            currentTime = time.time() if runTimer else gameOverTime
+            if team == playerMove and trunCount > 2:
+                timeToDraw += int(currentTime) - moveStartTime
             mins: int = (timeToDraw % 3600) // 60
             secs: int = timeToDraw % 60
             startX: int = 800 * team + 80
             startY: int = 140
-            scrText(startX, startY, f'-{hrs:0>2}:{mins:0>2}:{secs:0>2}', GRAY)
+            scrText(startX, startY, f'{mins:0>2}:{secs:0>2}', GRAY)
             
         # Draw killed pieces
         for team in range(2):

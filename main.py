@@ -420,19 +420,7 @@ def boardClick(screenX: int, screenY: int) -> None:
         boardY: int = 7 - math.floor(screenY / 80)
     # Try to select a piece
     if getBoard(boardX, boardY) and not selected:
-        selected = getBoard(boardX, boardY)
-        if selected:
-            # Traps and enemy pieces are uncontrollable
-            if selected.team == playerMove and selected.isControllable():
-                moves = getMoves(selected)
-                for moveData in moves:
-                    moveToX = selected.x + moveData[0]
-                    moveToY = selected.y + moveData[1]
-                    possibleMoves.append([moveToX, moveToY, moveData[2]])
-                buttons.clear()
-                buttonIds.clear()
-            else:
-                deselect()
+        select(getBoard(boardX, boardY))
     # Try to move a piece
     else:
         # Normal move
@@ -521,17 +509,24 @@ def boardClick(screenX: int, screenY: int) -> None:
         else:         
             # If there is a piece, try to select it
             deselect()
-            selected = getBoard(boardX, boardY)
-            if selected:
-                # Traps and enemy pieces are uncontrollable
-                if selected.team == playerMove and selected.name != 'trap':
-                    moves = getMoves(selected)
-                    for moveData in moves:
-                        moveToX = selected.x + moveData[0]
-                        moveToY = selected.y + moveData[1]
-                        possibleMoves.append([moveToX, moveToY, moveData[2]])
-                else:
-                    deselect()
+            select(getBoard(boardX, boardY))
+
+# Select a piece
+def select(piece) -> None:
+    global selected, possibleMoves, buttons, buttonIds
+    selected = piece
+    if selected:
+        # Traps and enemy pieces are uncontrollable
+        if selected.team == playerMove and selected.isControllable():
+            moves = getMoves(selected)
+            for moveData in moves:
+                moveToX = selected.x + moveData[0]
+                moveToY = selected.y + moveData[1]
+                possibleMoves.append([moveToX, moveToY, moveData[2]])
+            buttons.clear()
+            buttonIds.clear()
+        else:
+            deselect()
 
 # Deselect a piece
 def deselect() -> None:

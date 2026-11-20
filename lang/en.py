@@ -86,7 +86,7 @@ Guide = [
     ['3/3',
      '!h', 'Keywords',
      'Instant: You can make a move after using this',
-     'ability',
+     'ability.',
      'Charged: This ability is ready when the game',
      'starts.',
      'Ghost form: Piece cannot take or be taken.',

@@ -9,6 +9,8 @@
 
 # Beta tester: musorshiк
 
+# TODO animations, ultimate
+
 """Change this to any other supported langauge.
 Supported langauges are listed in "lang" folder as Python scripts."""
 import lang.en as lang
@@ -31,7 +33,7 @@ class Piece:
         self.x: int = x
         self.y: int = y
         self.color: str = 'White' if self.team == 0 else 'Black'
-        self.id: int = getId(self.name)
+        self.id: int = IDs.of(self.name)
         self.cost: int = getCost(self.name)
         self.statuses: list[list[str,int]] = []
         self.charge: int = 0
@@ -60,7 +62,39 @@ class Piece:
         return f'Piece({self.team}, \'{self.name}\', {self.x}, {self.y})'
     def __str__(self):
         return self.color.upper()[0] + self.name.upper()[0]
-    
+
+# Get rid of magic numbers
+pieceNames: list[str] = ['pawn', 'rook', 'knight', 'bishop', 'queen', 'king', 'trap', 'zombie']
+pieceCost: list[int] = [1, 5, 3, 3, 9, 0, 0]
+class IDs:
+    pawn = 0
+    rook = 1
+    knight = 2
+    bishop = 3
+    queen = 4
+    king = 5
+    trap = 6
+    zombie = 7
+
+    @staticmethod
+    def of(name: str) -> int:
+        if name in pieceNames: return pieceNames.index(name)
+        return -1
+
+    @staticmethod
+    def by(pieceID: int):
+        if 0 <= pieceID < len(pieceNames): return pieceNames[id]
+        return f'unknown: {pieceID}'
+
+    @staticmethod
+    def cost(piece): # No reason to make it this complicated but why not
+        if type(piece) == int:
+            return pieceCost[piece]
+        elif type(piece) == str:
+            return pieceCost[IDs.of(piece)]
+        else:
+            return 0
+
 # Use a piece's ability
 def useAbility(piece: Piece, toPos: list[int]) -> None:
     fromPos = [piece.x, piece.y]
@@ -89,16 +123,7 @@ def move(piece: Piece, toPos: list[int], move: bool = True) -> Piece|bool:
     moveTo = getBoard(toPos[0], toPos[1])
     Board[toPos[1]][toPos[0]] = piece
     return moveTo
-# Gets piece id by name
-pieceNames: list[str] = ['pawn', 'rook', 'knight', 'bishop', 'queen', 'king', 'trap', 'zombie']
-def getId(name: str) -> int:
-    if name in pieceNames:
-        return pieceNames.index(name)
-    else:
-        return -1
-def getName(pieceId: int) -> str:
-    global pieceNames
-    return pieceNames[pieceId]
+
 # Gets piece material by name
 def getCost(name: str) -> int:
     if name == 'pawn':
@@ -661,7 +686,7 @@ def selectAbility(team_piece: str, abil: int = -1) -> None:
     if abil == -1:
         abil = int(not getAbility(team, pieceId))
         word = lang.get('active') if abil == 0 else lang.get('passive')
-        mainMenuText = [lang.get(getName(pieceId)) + lang.get('s') + word]
+        mainMenuText = [lang.get(IDs.by(pieceId)) + lang.get('s') + word]
         mainMenuText += AbilDescr[pieceId][abil]
     Abils[team][pieceId] = abil
 def startGame(_) -> None:
@@ -672,9 +697,10 @@ def startGame(_) -> None:
         if getAbility(team, 1) == 0:
             for rook in findPieces(team, 'rook'):
                 rook.charge = 3
-        if getAbility(team, 3) == 0:
-            for bishop in findPieces(team, 'bishop'):
-                bishop.charge = 3
+        # Cut out - pontentially a selectable ultimate?
+        #if getAbility(team, 3) == 0:
+        #    for bishop in findPieces(team, 'bishop'):
+        #        bishop.charge = 3
         if getAbility(team, 4) == 0:
             findPieces(team, 'queen')[0].charge = 1
         if getAbility(team, 5) == 0:
@@ -890,7 +916,7 @@ while True:
                     scrRect(320+80*(pieceId-1)+10, 640+10, 60, 60, DARK_GRAY)
                     if selected.y == int(not selected.team) * 7:
                         # Ids from 22 to 27
-                        button(21+pieceId, screen.blit(pieceImage, (320+80*(pieceId-1), 640)), promote, getName(pieceId))
+                        button(21+pieceId, screen.blit(pieceImage, (320+80*(pieceId-1), 640)), promote, IDs.by(pieceId))
             # Castle buttons
             elif drawInsteadOfMove[0] == 'castle':
                 team: int = drawInsteadOfMove[1]
@@ -995,7 +1021,7 @@ while True:
                 startY: int = 160
                 xOffset: int = 40 * (kill%4)
                 yOffset: int = 40 * (kill//4)
-                screen.blit(pygame.image.load(f'sprites/pieces/{int(not team)}/mini/{getId(kills[team][kill])}.png'), (startX + xOffset, startY + yOffset))
+                screen.blit(pygame.image.load(f'sprites/pieces/{int(not team)}/mini/{IDs.of(kills[team][kill])}.png'), (startX + xOffset, startY + yOffset))
         # Draw moves
             for moveData in possibleMoves:
                 drawMove(moveData[0], moveData[1], moveData[2])
